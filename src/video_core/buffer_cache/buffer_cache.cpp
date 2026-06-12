@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <unordered_set>
+#include <cmath>
 #include <algorithm>
 #include "common/alignment.h"
 #include "common/debug.h"
@@ -375,8 +377,8 @@ void BufferCache::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, 
 std::pair<Buffer*, u32> BufferCache::ObtainBuffer(VAddr device_addr, u32 size, bool is_written,
                                                   bool is_texel_buffer, BufferId buffer_id) {
     // For read-only buffers use device local stream buffer to reduce renderpass breaks.
-    if (!is_written && size <= CACHING_PAGESIZE && !IsRegionGpuModified(device_addr, size) &&
-        IsRegionCpuModified(device_addr, size)) {
+    if (false && !is_written && size <= CACHING_PAGESIZE && !IsRegionGpuModified(device_addr, size) &&
+    IsRegionCpuModified(device_addr, size)) {
         const u64 offset = stream_buffer.Copy(device_addr, size, instance.UniformMinAlignment());
         return {&stream_buffer, offset};
     }
@@ -698,10 +700,78 @@ vk::Buffer BufferCache::UploadCopies(Buffer& buffer, std::span<vk::BufferCopy> c
     }
     const auto [staging, offset] = staging_buffer.Map(total_size_bytes);
     if (staging) {
+        static std::unordered_set<VAddr> logged_addrs;
         for (auto& copy : copies) {
             u8* const src_pointer = staging + copy.srcOffset;
             const VAddr device_addr = buffer.CpuAddr() + copy.dstOffset;
             memory->CopySparseMemory(device_addr, src_pointer, copy.size);
+          if (size == 2272 &&
+
+    logged_addrs.insert(device_addr).second) {
+
+
+
+    const float* f =
+
+        reinterpret_cast<const float*>(cpu_addr);
+
+
+
+    LOG_WARNING(Render_Vulkan,
+
+        "[DSR_BUG][MATRIX] addr={:#x} "
+
+        "f0={} f1={} f2={} f3={} "
+
+        "f4={} f5={} f6={} f7={} "
+
+        "f8={} f9={} f10={} f11={} "
+
+        "f12={} f13={} f14={} f15={}",
+
+        device_addr,
+
+        f[0], f[1], f[2], f[3],
+
+        f[4], f[5], f[6], f[7],
+
+        f[8], f[9], f[10], f[11],
+
+        f[12], f[13], f[14], f[15]);
+
+
+
+    bool bad = false;
+
+
+
+    for (u32 i = 0; i < 16; i++) {
+
+        if (!std::isfinite(f[i]) ||
+
+            std::abs(f[i]) > 1000000.0f) {
+
+            bad = true;
+
+            break;
+
+        }
+
+    }
+
+
+
+    if (bad) {
+
+        LOG_ERROR(Render_Vulkan,
+
+            "[DSR_BUG][MATRIX_BAD] addr={:#x}",
+
+            device_addr);
+
+    }
+
+}
             // Apply the staging offset
             copy.srcOffset += offset;
         }
